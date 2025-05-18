@@ -3,26 +3,45 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { initializeDatabase } from './config/database';
 import authRoutes from './routes/authRoutes';
+import { seedDefaultRoles } from './seeders/defaultRoles';
 
 dotenv.config();
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+class AuthServer {
+  private app: express.Application;
+  private port: number | string;
 
-app.use(cors());
-app.use(express.json());
+  constructor() {
+    this.app = express();
+    this.port = process.env.PORT || 3000;
+    this.configureMiddleware();
+    this.configureRoutes();
+  }
 
-// Initialize database
-initializeDatabase();
+  private configureMiddleware(): void {
+    this.app.use(cors());
+    this.app.use(express.json());
+  }
 
-// Routes
-app.use('/api/v1/auth', authRoutes);
+  private configureRoutes(): void {
+    this.app.use('/api/v1/auth', authRoutes);
+    this.app.get('/health', (req, res) => {
+      res.status(200).json({ status: 'OK' });
+    });
+  }
 
-// Health check
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK' });
-});
+  public async start(): Promise<void> {
+    await initializeDatabase();
+    await seedDefaultRoles();
 
-app.listen(PORT, () => {
-  console.log(`Auth service running on port ${PORT}`);
+    this.app.listen(this.port, () => {
+      console.log(`Auth service running on port ${this.port}`);
+    });
+  }
+}
+
+const server = new AuthServer();
+server.start().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
